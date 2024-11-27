@@ -15,12 +15,12 @@ async function init() {
     let drawingInfos = [];
     let frames = [1, 40, 70, 80, 140, 160, 180, 210, 225];
     let frames_dst = "./data/keyframes_cube/num.obj";
+    let fps = 24;
     for (let frame of frames) {
         const obj_filename = frames_dst.replace("num", frame);
         const drawingInfo = await readOBJFile(obj_filename, 1.0, true)
         drawingInfos.push(drawingInfo);
     }
-    console.log(drawingInfos);
 
     function getInterpolated(frame) {
         if (frame < frames[0]) {
@@ -73,8 +73,7 @@ async function init() {
     }
 
     let drawingInfo = getInterpolated(0);
-    console.log(drawingInfo);
-    
+
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.DEPTH_TEST);
 
@@ -89,7 +88,7 @@ async function init() {
 
     aspect_ratio = canvas.width / canvas.height;
 
-    
+
     // Get locations of attributes and uniforms
     let loc_a_position = gl.getAttribLocation(program, 'a_position');
     let loc_a_normal = gl.getAttribLocation(program, 'a_normal');
@@ -126,11 +125,11 @@ async function init() {
     var lightPos = vec4(0, 0, -1, 0);
 
 
-    const computeBuffers = () => {
-        const indices = drawingInfo.indices;
-        const vertices = drawingInfo.vertices;
-        const normals = drawingInfo.normals;
-        const colors = drawingInfo.colors;
+    const computeBuffers = (drawInfo) => {
+        const indices = drawInfo.indices;
+        const vertices = drawInfo.vertices;
+        const normals = drawInfo.normals;
+        const colors = drawInfo.colors;
 
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer_vertex);
         gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
@@ -145,7 +144,17 @@ async function init() {
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
     }
 
+    let start_time = window.performance.now();
+    let frametime = 1000.0/fps;
+    let frame_base = 0;
+
     const render = () => {
+        let current_time = window.performance.now();
+        let delta = current_time - start_time;
+        let frame_n = frame_base + Math.floor(delta / frametime);
+
+        computeBuffers(getInterpolated(frame_n));
+
         var model = mat4();
         var proj = perspective(60, aspect_ratio, 0.1, 100);
 
@@ -167,10 +176,9 @@ async function init() {
 
         gl.drawElements(gl.TRIANGLES, drawingInfo.indices.length, gl.UNSIGNED_INT, 0);
 
-
         requestAnimationFrame(render);
     };
-    computeBuffers();
+    computeBuffers(getInterpolated(0));
     render();
 }
 
