@@ -1,9 +1,7 @@
-
-
 async function init() {
     const canvas = document.getElementById('glCanvas');
 
-    const obj_filename = "./data/cube.obj";
+    const obj_filename = "./data/keyframes_cube/jumping_cube_8.obj";
     const drawingInfo = await readOBJFile(obj_filename, 1.0, true);
     console.log(drawingInfo);
 
@@ -85,22 +83,18 @@ async function init() {
 
     const render = () => {
         var model = mat4();
-        var proj = perspective(45, aspect_ratio, 0.1, 10);
+        var proj = perspective(60, aspect_ratio, 0.1, 100);
 
-        var camera_distance = 4.0;
-        var camera_x = 0 * camera_distance;
-        var camera_z = 1 * camera_distance;
-
-        var eye = vec3(camera_x, 0, camera_z);
-
-        var view = lookAt(eye, vec3(0, 0, 0), vec3(0, 1, 0));
+        var eye = vec3(12, 2, 0);
+        var at = vec3(0, -2.5, -3.33);
+        var up = vec3(0, 1, 0);
+        var view = lookAt(eye, at, up);
 
         let clearColor = [0.2, 0.4, 0.3];
 
         gl.clearColor(...clearColor, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        model = mat4();
         gl.uniformMatrix4fv(loc_u_model, false, flatten(model));
         gl.uniformMatrix4fv(loc_u_view, false, flatten(view));
         gl.uniformMatrix4fv(loc_u_proj, false, flatten(proj));
