@@ -1,16 +1,80 @@
+function interpolate(a, b, t) {
+    return a * (1 - t) + b * t;
+}
+
 async function init() {
     const canvas = document.getElementById('glCanvas');
-
-    const obj_filename = "./data/keyframes_cube/jumping_cube_8.obj";
-    const drawingInfo = await readOBJFile(obj_filename, 1.0, true);
-    console.log(drawingInfo);
-
 
     const gl = WebGLUtils.setupWebGL(canvas);
     if (!gl) {
         alert('Your browser does not support WebGL');
     }
 
+
+    // Read all the obj files comprising the keyframes
+    let drawingInfos = [];
+    let frames = [1, 40, 70, 80, 140, 160, 180, 210, 225];
+    let frames_dst = "./data/keyframes_cube/num.obj";
+    for (let frame of frames) {
+        const obj_filename = frames_dst.replace("num", frame);
+        const drawingInfo = await readOBJFile(obj_filename, 1.0, true)
+        drawingInfos.push(drawingInfo);
+    }
+    console.log(drawingInfos);
+
+    function getInterpolated(frame) {
+        if (frame < frames[0]) {
+            return {vertices: drawingInfos[0].vertices,
+                    normals: drawingInfos[0].normals,
+                    colors: drawingInfos[0].colors,
+                    indices: drawingInfos[0].indices};
+        }
+
+        if (frame >= frames[frames.length - 1]) {
+            return {vertices: drawingInfos[drawingInfos.length - 1].vertices,
+                    normals: drawingInfos[drawingInfos.length - 1].normals,
+                    colors: drawingInfos[drawingInfos.length - 1].colors,
+                    indices: drawingInfos[drawingInfos.length - 1].indices};
+        }
+
+        for (let i = 0; i < frames.length - 1; i++) {
+            if (frame >= frames[i] && frame < frames[i + 1]) {
+                drawing_1 = drawingInfos[i];
+                drawing_2 = drawingInfos[i + 1];
+
+                // Interpolate between drawing_1 and drawing_2
+                let t = (frame - frames[i]) / (frames[i + 1] - frames[i]);
+                let vertices = [];
+                let normals = [];
+                let colors = [];
+                let indices = [];
+
+                for (let j = 0; j < drawing_1.vertices.length; j++) {
+                    let vertex = interpolate(drawing_1.vertices[j], drawing_2.vertices[j], t);
+                    vertices.push(vertex);
+
+                    let normal = interpolate(drawing_1.normals[j], drawing_2.normals[j], t);
+                    normals.push(normal);
+
+                    let color = interpolate(drawing_1.colors[j], drawing_2.colors[j], t);
+                    colors.push(color);
+                }
+
+                for (let j = 0; j < drawing_1.indices.length; j++) {
+                    indices.push(drawing_1.indices[j]);
+                }
+
+                return {vertices: new Float32Array(vertices),
+                        normals: new Float32Array(normals),
+                        colors: new Float32Array(colors),
+                        indices: new Int32Array(indices)};
+            }
+        }
+    }
+
+    let drawingInfo = getInterpolated(0);
+    console.log(drawingInfo);
+    
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.DEPTH_TEST);
 
@@ -25,8 +89,8 @@ async function init() {
 
     aspect_ratio = canvas.width / canvas.height;
 
-    // Get locations
-
+    
+    // Get locations of attributes and uniforms
     let loc_a_position = gl.getAttribLocation(program, 'a_position');
     let loc_a_normal = gl.getAttribLocation(program, 'a_normal');
     let loc_a_color = gl.getAttribLocation(program, 'a_color');
