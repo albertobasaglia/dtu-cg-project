@@ -3,7 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <title>Final Project</title>
+    <script type="text/javascript" src="./common/webgl-utils.js"></script>
+    <script type="text/javascript" src="./common/initShaders.js"></script>
+    <script type="text/javascript" src="./common/MV.js"></script>
+    <script type="text/javascript" src="./common/OBJParser.js"></script>
+    <script type="text/javascript" src="script.js"></script>
   </head>
+  
   <body>
     <canvas id="glCanvas" width="1080" height="720"></canvas>
 
@@ -68,10 +74,7 @@
             gl_FragColor = vec4(result, 1.0);
         }
     </script>
-    <script type="text/javascript" src="./common/webgl-utils.js"></script>
-    <script type="text/javascript" src="./common/initShaders.js"></script>
-    <script type="text/javascript" src="./common/MV.js"></script>
-    <script type="text/javascript" src="./common/OBJParser.js"></script>
-    <script type="text/javascript" src="script.js"></script>
+    <p>The current queue is: </p>
+    <p id="showQueue"></p>
   </body>
 </html>
