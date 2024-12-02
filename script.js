@@ -12,38 +12,71 @@ async function init() {
 
 
     // Read all the obj files comprising the keyframes
-    let drawingInfos = [];
-    let frames = [1, 40, 70, 80, 140, 160, 180, 210, 225];
-    let frames_dst = "./data/keyframes_cube/num.obj";
-    let fps = 24;
-    for (let frame of frames) {
-        const obj_filename = frames_dst.replace("num", frame);
-        const drawingInfo = await readOBJFile(obj_filename, 1.0, true)
-        drawingInfos.push(drawingInfo);
+    let drawingInfos = {};
+    let frames = {"idle": [1, 10, 35, 85, 115, 125],
+                  "wave": [1, 100, 150, 200, 250, 300],
+                  "headbang": [1, 15, 90, 135, 150],
+                  "jumpingjack": [1, 20, 35, 50, 65, 80, 100]};
+    let frames_dst = "./data/keyframes_goblin/num.obj";
+    let defaultScene = "idle";
+    let currentScene = defaultScene;
+    let queue = [];
+    let fps = 60;
+    for (const [scene, obj] of Object.entries(frames)) {
+        drawingInfos[scene] = [];
+        for (let frame of frames[scene]) {
+            const obj_filename = frames_dst.replace("num", scene + "_" + frame);
+            const drawingInfo = await readOBJFile(obj_filename, 1.0, true)
+            drawingInfos[scene].push(drawingInfo);
+        }
     }
+    
+    // Get a keypress event and change the scene
+    function keyPress(event) {
+        if (event.keyCode == 13) {
+            queue.push("headbang");
 
+            // Show the queue in the text field
+            document.getElementById("showQueue").innerHTML = queue;
+        }
+
+        if (event.keyCode == 32) {
+            queue.push("jumpingjack");
+            document.getElementById("showQueue").innerHTML = queue;
+        }
+
+        if (event.keyCode == 87) {
+            queue.push("wave");
+            document.getElementById("showQueue").innerHTML = queue;
+        }
+    }
+    document.addEventListener('keydown', keyPress);
+    
     function getInterpolated(frame) {
-        if (frame < frames[0]) {
-            return {vertices: drawingInfos[0].vertices,
-                    normals: drawingInfos[0].normals,
-                    colors: drawingInfos[0].colors,
-                    indices: drawingInfos[0].indices};
+        let currentDrawingInfos = drawingInfos[currentScene];
+        let currentFrames = frames[currentScene];
+
+        if (frame < currentFrames[0]) {
+            return {vertices: currentDrawingInfos[0].vertices,
+                    normals: currentDrawingInfos[0].normals,
+                    colors: currentDrawingInfos[0].colors,
+                    indices: currentDrawingInfos[0].indices};
         }
 
-        if (frame >= frames[frames.length - 1]) {
-            return {vertices: drawingInfos[drawingInfos.length - 1].vertices,
-                    normals: drawingInfos[drawingInfos.length - 1].normals,
-                    colors: drawingInfos[drawingInfos.length - 1].colors,
-                    indices: drawingInfos[drawingInfos.length - 1].indices};
+        if (frame >= currentFrames[currentFrames.length - 1]) {
+            return {vertices: currentDrawingInfos[currentDrawingInfos.length - 1].vertices,
+                    normals: currentDrawingInfos[currentDrawingInfos.length - 1].normals,
+                    colors: currentDrawingInfos[currentDrawingInfos.length - 1].colors,
+                    indices: currentDrawingInfos[currentDrawingInfos.length - 1].indices};
         }
 
-        for (let i = 0; i < frames.length - 1; i++) {
-            if (frame >= frames[i] && frame < frames[i + 1]) {
-                drawing_1 = drawingInfos[i];
-                drawing_2 = drawingInfos[i + 1];
+        for (let i = 0; i < currentFrames.length - 1; i++) {
+            if (frame >= currentFrames[i] && frame < currentFrames[i + 1]) {
+                drawing_1 = currentDrawingInfos[i];
+                drawing_2 = currentDrawingInfos[i + 1];
 
                 // Interpolate between drawing_1 and drawing_2
-                let t = (frame - frames[i]) / (frames[i + 1] - frames[i]);
+                let t = (frame - currentFrames[i]) / (currentFrames[i + 1] - currentFrames[i]);
                 let vertices = [];
                 let normals = [];
                 let colors = [];
@@ -158,8 +191,8 @@ async function init() {
         var model = mat4();
         var proj = perspective(60, aspect_ratio, 0.1, 100);
 
-        var eye = vec3(12, 2, 0);
-        var at = vec3(0, -2.5, -3.33);
+        var eye = vec3(0, 3, 8);
+        var at = vec3(0, 2.5, 0);
         var up = vec3(0, 1, 0);
         var view = lookAt(eye, at, up);
 
@@ -175,6 +208,20 @@ async function init() {
         gl.uniform3fv(loc_u_eye, eye);
 
         gl.drawElements(gl.TRIANGLES, drawingInfo.indices.length, gl.UNSIGNED_INT, 0);
+
+        if (frame_n >= frames[currentScene][frames[currentScene].length - 1]) {
+            frame_base = 0;
+            start_time = window.performance.now();
+            
+            if (queue.length > 0) {
+                currentScene = queue.shift();
+
+                // Remove that scene from the queue
+                document.getElementById("showQueue").innerHTML = queue;
+            } else {
+                currentScene = defaultScene;
+            }
+        }
 
         requestAnimationFrame(render);
     };
