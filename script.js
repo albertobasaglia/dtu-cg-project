@@ -21,6 +21,7 @@ async function init() {
     const playPause = document.getElementById("playpause");
     const prevFrame = document.getElementById("prevframe");
     const nextFrame = document.getElementById("nextframe");
+    const slider = document.getElementById("range");
 
     const gl = WebGLUtils.setupWebGL(canvas);
     if (!gl) {
@@ -55,6 +56,12 @@ async function init() {
                 interactiveDiv.style.display = "none";
                 inspectDiv.style.display = "block";
                 animationMenu.style.display = "none";
+                prevFrame.disabled = true;
+
+                slider.min = 0;
+                slider.max = frames[scene][frames[scene].length - 1];
+                slider.value = 0;
+
                 pause_time = window.performance.now();
                 start_time = window.performance.now();
                 frame_base = 0;
@@ -69,12 +76,37 @@ async function init() {
         animationMenu.style.display = "inline-block";
     });
 
+
+
+    function updateInputs() {
+        if (frame_base == 0) {
+            prevFrame.disabled = true;
+        } else {
+            prevFrame.disabled = false;
+        }
+
+        if (frame_base == parseInt(slider.max)) {
+            nextFrame.disabled = true;
+        } else {
+            nextFrame.disabled = false;
+        }
+
+        slider.value = frame_base;
+    }
+
+    slider.addEventListener("input", function() {
+        frame_base = parseInt(slider.value);
+        updateInputs();
+    });
+
     nextFrame.addEventListener("click", function() {
         frame_base += 1;
+        updateInputs();
     });
 
     prevFrame.addEventListener("click", function() {
         frame_base -= 1;
+        updateInputs();
     });
 
     writeAnimationMenu(frames);
