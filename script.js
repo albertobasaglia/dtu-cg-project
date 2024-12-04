@@ -2,6 +2,15 @@ function interpolate(a, b, t) {
     return a * (1 - t) + b * t;
 }
 
+function initQuat(z_dir) {
+    var q_rot = new Quaternion();
+    var q_inc = new Quaternion();
+    q_rot = q_rot.make_rot_vec2vec(vec3([0, 0, 1]), normalize(z_dir));
+    var q_rot_inv = new Quaternion(q_rot);
+    q_rot_inv.invert();
+    return [q_rot, q_inc, q_rot_inv];
+}
+
 async function init() {
     const canvas = document.getElementById('glCanvas');
 
@@ -33,29 +42,38 @@ async function init() {
     
     // Get a keypress event and change the scene
     function keyPress(event) {
-        if (event.keyCode == 13) {
+        if (event.keyCode == 13) { // Enter key
             queue.push("headbang");
 
             // Show the queue in the text field
             document.getElementById("showQueue").innerHTML = queue;
         }
 
-        if (event.keyCode == 32) {
+        if (event.keyCode == 32) { // Space key
             queue.push("jumpingjack");
             document.getElementById("showQueue").innerHTML = queue;
         }
 
-        if (event.keyCode == 87) {
+        if (event.keyCode == 87) { // w key
             queue.push("wave");
             document.getElementById("showQueue").innerHTML = queue;
+        }
+        
+        // Reset quaternion rotation
+        if (event.keyCode == 82) { // r key
+            [q_rot, q_inc, q_rot_inv] = initQuat(z_dir);
+            up = q_rot_inv.apply(up);
+            eye_pan = vec3(eye_dist, 0, 0);
         }
     }
     document.addEventListener('keydown', keyPress);
     
+    // Interpolate between two keyframes
     function getInterpolated(frame) {
         let currentDrawingInfos = drawingInfos[currentScene];
         let currentFrames = frames[currentScene];
 
+        // If the frame is before the first keyframe
         if (frame < currentFrames[0]) {
             return {vertices: currentDrawingInfos[0].vertices,
                     normals: currentDrawingInfos[0].normals,
@@ -63,6 +81,7 @@ async function init() {
                     indices: currentDrawingInfos[0].indices};
         }
 
+        // If the frame is after the last keyframe
         if (frame >= currentFrames[currentFrames.length - 1]) {
             return {vertices: currentDrawingInfos[currentDrawingInfos.length - 1].vertices,
                     normals: currentDrawingInfos[currentDrawingInfos.length - 1].normals,
@@ -70,6 +89,7 @@ async function init() {
                     indices: currentDrawingInfos[currentDrawingInfos.length - 1].indices};
         }
 
+        // Find the two keyframes to interpolate between
         for (let i = 0; i < currentFrames.length - 1; i++) {
             if (frame >= currentFrames[i] && frame < currentFrames[i + 1]) {
                 drawing_1 = currentDrawingInfos[i];
@@ -105,21 +125,25 @@ async function init() {
         }
     }
 
+    // Get the first frame
     let drawingInfo = getInterpolated(0);
 
+
+    // Initialize WebGL
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.DEPTH_TEST);
 
     var program = initShaders(gl, 'vertex-shader', 'fragment-shader');
     gl.useProgram(program);
 
+    let clearColor = [0.8, 0.4, 0.1];
+    gl.clearColor(...clearColor, 1.0);
+
     // Enable usage of u32 for webgl
     var ext = gl.getExtension('OES_element_index_uint');
     if (!ext) {
         console.log('Warning: Unable to use an extension');
     }
-
-    aspect_ratio = canvas.width / canvas.height;
 
 
     // Get locations of attributes and uniforms
@@ -133,6 +157,7 @@ async function init() {
     let loc_u_lightPos = gl.getUniformLocation(program, 'u_lightPos');
     let loc_u_eye = gl.getUniformLocation(program, 'u_eye');
 
+    // Create buffers
     let buffer_vertex = gl.createBuffer();
     let buffer_normal = gl.createBuffer();
     let buffer_color = gl.createBuffer();
@@ -154,10 +179,15 @@ async function init() {
     gl.enableVertexAttribArray(loc_a_color);
 
 
-
+    // Variable declarations
+    let aspect_ratio = canvas.width / canvas.height;    
+    let start_time = window.performance.now();
+    let frametime = 1000.0/fps;
+    let frame_base = 0;
     var lightPos = vec4(0, 0, -1, 0);
 
 
+    // Helper functions
     const computeBuffers = (drawInfo) => {
         const indices = drawInfo.indices;
         const vertices = drawInfo.vertices;
@@ -177,28 +207,161 @@ async function init() {
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
     }
 
-    let start_time = window.performance.now();
-    let frametime = 1000.0/fps;
-    let frame_base = 0;
+    // Project an x,y pair onto a sphere of radius r OR a hyperbolic sheet
+    // if we are away from the center of the sphere.
+    function project_to_sphere(x, y) {
+        var r = 2;
+        var d = Math.sqrt(x * x + y * y);
+        var t = r * Math.sqrt(2);
+        var z;
+        if (d < r)  // Inside sphere
+            z = Math.sqrt(r * r - d * d);
+        else if (d < t)
+            z = 0;
+        else        // On hyperbola
+            z = t * t / d;
+        return z;
+    }
 
+    // Trackball
+    var eye = vec3(0, 3, 6);
+    var at = vec3(0, 2.5, 0);
+    var up = vec3(0, 1, 0);
+    var z_dir = subtract(eye, at);
+    var eye_dist = length(z_dir);
+    var eye_pan = vec3(eye_dist, 0, 0);
+    
+    // Initialize quaternions
+    var [q_rot, q_inc, q_rot_inv] = initQuat(z_dir);
+    up = q_rot_inv.apply(up);
+
+    // Mouse movement
+    var x0 = 0; var y0 = 0;
+    var moving = false;
+    var lastTime = Date.now();
+    var action = 0; // 0: no action, 1: rotate, 2: dolly, 3: pan
+
+
+    // When the mouse is pressed
+    canvas.onmousedown = function (ev) {
+        x = ev.clientX; y = ev.clientY;
+        
+        // Start dragging if a mouse is in <canvas>
+        var rect = ev.target.getBoundingClientRect();
+        if (rect.left <= x && x < rect.right && rect.top <= y && y < rect.bottom) {
+            x0 = x; y0 = y;
+            moving = true;
+            action = ev.button + 1; // each mouse button has a different value
+        }
+    };
+
+    // Disable right-click context menu
+    canvas.oncontextmenu = function (ev) { ev.preventDefault(); };
+
+    // When the mouse is moved
+    canvas.onmousemove = function (ev) {
+        if (moving) {
+            var now = Date.now();
+            var elapsed = now - lastTime;
+            if (elapsed > 10) {
+                lastTime = now;
+                
+                var x = ev.clientX; var y = ev.clientY;
+                var rect = ev.target.getBoundingClientRect();
+                var s_x = ((x - rect.left) / rect.width - 0.5) * 2;
+                var s_y = (0.5 - (y - rect.top) / rect.height) * 2;
+                var s_last_x = ((x0 - rect.left) / rect.width - 0.5) * 2;
+                var s_last_y = (0.5 - (y0 - rect.top) / rect.height) * 2;
+
+                switch (action) {
+                    case 1: {// Rotate
+                        var u = new vec3([s_x, s_y, project_to_sphere(s_x, s_y)]);
+                        var v = new vec3([s_last_x, s_last_y, project_to_sphere(s_last_x, s_last_y)]);
+                        q_inc = q_inc.make_rot_vec2vec(normalize(u), normalize(v));
+                        break;
+                    }
+                    case 2: {// Dolly
+                        eye_pan[0] += (s_y - s_last_y) * eye_pan[0];
+                        eye_pan[0] = Math.max(0.1, eye_pan[0]);
+                        break;
+                    }
+                    case 3: {// Pan
+                        eye_pan[1] += (s_x - s_last_x) * eye_pan[0] * 0.25;
+                        eye_pan[2] += (s_y - s_last_y) * eye_pan[0] * 0.25;
+                        break;
+                    }
+                }
+                x0 = x; y0 = y;
+            }
+        }
+    };
+
+    // When the mouse is released
+    canvas.onmouseup = function (ev) {
+        var x = ev.clientX; var y = ev.clientY;
+        if(x0 == x && y0 == y) {
+            q_inc.setIdentity();
+        }
+        moving = false;
+        action = 0;
+    };
+
+    // If the mouse is out of the canvas
+    canvas.onmouseleave = function (_) {
+        moving = false;
+        action = 0;
+    }
+
+    // Canvas event listeners
+    canvas.addEventListener("touchstart", function (ev) {
+        ev.preventDefault();
+        if (ev.targetTouches.length === 1) {
+            var touch = ev.targetTouches[0];
+            touch.preventDefault = function () { };
+            touch.button = 0;
+            canvas.onmousedown(touch);
+            this.addEventListener("touchmove", roll, false);
+            this.addEventListener("touchend", release, false);
+
+            function roll(e) {
+                touch = e.targetTouches[0];
+                canvas.onmousemove(touch);
+                console.log("touchmove");
+            }
+            function release() {
+                canvas.onmouseup(touch);
+                this.removeEventListener("touchmove", roll);
+                this.removeEventListener("touchend", release);
+            }
+        }
+    });
+
+
+    // Render function
     const render = () => {
+        // Update the frame number
         let current_time = window.performance.now();
         let delta = current_time - start_time;
         let frame_n = frame_base + Math.floor(delta / frametime);
 
         computeBuffers(getInterpolated(frame_n));
 
-        var model = mat4();
-        var proj = perspective(60, aspect_ratio, 0.1, 100);
+        // Define the model, view and projection matrices
+        var model = mat4(); // identity matrix
+        var fovy = 60; var near = 0.1; var far = 100;
+        var proj = perspective(fovy, aspect_ratio, near, far);
+        
+        // Rotate view with quaternion
+        q_rot = q_rot.multiply(q_inc);
+        var rot_up = q_rot.apply(up);
+        var right = q_rot.apply(vec3(1, 0, 0));
+        var centre = vec3([at[0] - right[0] * eye_pan[1] - rot_up[0] * eye_pan[2], at[1] - right[1] * eye_pan[1] - rot_up[1] * eye_pan[2], at[2] - right[2] * eye_pan[1] - rot_up[2] * eye_pan[2]]);
+        var rot_eye = q_rot.apply(vec3(0, 0, eye_pan[0]));
 
-        var eye = vec3(0, 3, 6);
-        var at = vec3(0, 2.5, 0);
-        var up = vec3(0, 1, 0);
-        var view = lookAt(eye, at, up);
+        var view = lookAt(add(rot_eye, centre), centre, rot_up); // Rotate using quaternion
+        //var view = lookAt(eye, at, up);
 
-        let clearColor = [0.8, 0.4, 0.1];
 
-        gl.clearColor(...clearColor, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         gl.uniformMatrix4fv(loc_u_model, false, flatten(model));
