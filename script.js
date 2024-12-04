@@ -74,6 +74,7 @@ async function init() {
         interactiveDiv.style.display = "block";
         inspectDiv.style.display = "none";
         animationMenu.style.display = "inline-block";
+        scene = defaultScene;
     });
 
 
