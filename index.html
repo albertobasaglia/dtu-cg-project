@@ -74,9 +74,15 @@
     </div>
 
     <script id="vertex-shader" type="x-shader/x-vertex">
-      attribute vec4 a_position;
-      attribute vec4 a_normal;
-      attribute vec4 a_color;
+      attribute vec4 a_position1;
+      attribute vec4 a_normal1;
+      attribute vec4 a_color1;
+
+      attribute vec4 a_position2;
+      attribute vec4 a_normal2;
+      attribute vec4 a_color2;
+
+      uniform float u_t;
 
       uniform mat4 u_model;
       uniform mat4 u_view;
@@ -87,6 +93,10 @@
       varying vec4 v_color;
 
       void main() {
+          vec4 a_position = mix(a_position1, a_position2, u_t);
+          vec4 a_normal = mix(a_normal1, a_normal2, u_t);
+          vec4 a_color = mix(a_color1, a_color2, u_t);
+
           vec4 worldPosition = u_model * a_position;
           v_fragPos = worldPosition.xyz;
           v_normal = normalize(mat3(u_model) * a_normal.xyz);

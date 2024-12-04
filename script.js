@@ -1,7 +1,3 @@
-function interpolate(a, b, t) {
-    return a * (1 - t) + b * t;
-}
-
 function initQuat(z_dir) {
     var q_rot = new Quaternion();
     var q_inc = new Quaternion();
@@ -157,20 +153,28 @@ async function init() {
         let currentDrawingInfos = drawingInfos[currentScene];
         let currentFrames = frames[currentScene];
 
+        let mesh1, mesh2, t;
+
         // If the frame is before the first keyframe
         if (frame < currentFrames[0]) {
-            return {vertices: currentDrawingInfos[0].vertices,
+            mesh1 = {vertices: currentDrawingInfos[0].vertices,
                     normals: currentDrawingInfos[0].normals,
                     colors: currentDrawingInfos[0].colors,
                     indices: currentDrawingInfos[0].indices};
+            mesh2 = mesh1;
+            t = 0.0;
+            return [mesh1, mesh2, t];
         }
 
         // If the frame is after the last keyframe
         if (frame >= currentFrames[currentFrames.length - 1]) {
-            return {vertices: currentDrawingInfos[currentDrawingInfos.length - 1].vertices,
+            mesh2 = {vertices: currentDrawingInfos[currentDrawingInfos.length - 1].vertices,
                     normals: currentDrawingInfos[currentDrawingInfos.length - 1].normals,
                     colors: currentDrawingInfos[currentDrawingInfos.length - 1].colors,
                     indices: currentDrawingInfos[currentDrawingInfos.length - 1].indices};
+            mesh1 = mesh2;
+            t = 1.0;
+            return [mesh1, mesh2, t];
         }
 
         // Find the two keyframes to interpolate between
@@ -179,32 +183,11 @@ async function init() {
                 drawing_1 = currentDrawingInfos[i];
                 drawing_2 = currentDrawingInfos[i + 1];
 
-                // Interpolate between drawing_1 and drawing_2
                 let t = (frame - currentFrames[i]) / (currentFrames[i + 1] - currentFrames[i]);
-                let vertices = [];
-                let normals = [];
-                let colors = [];
-                let indices = [];
+                mesh1 = drawing_1;
+                mesh2 = drawing_2;
 
-                for (let j = 0; j < drawing_1.vertices.length; j++) {
-                    let vertex = interpolate(drawing_1.vertices[j], drawing_2.vertices[j], t);
-                    vertices.push(vertex);
-
-                    let normal = interpolate(drawing_1.normals[j], drawing_2.normals[j], t);
-                    normals.push(normal);
-
-                    let color = interpolate(drawing_1.colors[j], drawing_2.colors[j], t);
-                    colors.push(color);
-                }
-
-                for (let j = 0; j < drawing_1.indices.length; j++) {
-                    indices.push(drawing_1.indices[j]);
-                }
-
-                return {vertices: new Float32Array(vertices),
-                        normals: new Float32Array(normals),
-                        colors: new Float32Array(colors),
-                        indices: new Int32Array(indices)};
+                return [mesh1, mesh2, t];
             }
         }
     }
@@ -231,36 +214,53 @@ async function init() {
 
 
     // Get locations of attributes and uniforms
-    let loc_a_position = gl.getAttribLocation(program, 'a_position');
-    let loc_a_normal = gl.getAttribLocation(program, 'a_normal');
-    let loc_a_color = gl.getAttribLocation(program, 'a_color');
+    let loc_a_position1 = gl.getAttribLocation(program, 'a_position1');
+    let loc_a_normal1 = gl.getAttribLocation(program, 'a_normal1');
+    let loc_a_color1 = gl.getAttribLocation(program, 'a_color1');
+
+    let loc_a_position2 = gl.getAttribLocation(program, 'a_position2');
+    let loc_a_normal2 = gl.getAttribLocation(program, 'a_normal2');
+    let loc_a_color2 = gl.getAttribLocation(program, 'a_color2');
 
     let loc_u_model = gl.getUniformLocation(program, 'u_model');
     let loc_u_view = gl.getUniformLocation(program, 'u_view');
     let loc_u_proj = gl.getUniformLocation(program, 'u_proj');
     let loc_u_lightPos = gl.getUniformLocation(program, 'u_lightPos');
     let loc_u_eye = gl.getUniformLocation(program, 'u_eye');
+    let loc_u_t = gl.getUniformLocation(program, 'u_t');
 
     // Create buffers
-    let buffer_vertex = gl.createBuffer();
-    let buffer_normal = gl.createBuffer();
-    let buffer_color = gl.createBuffer();
+    let buffer_vertex1 = gl.createBuffer();
+    let buffer_normal1 = gl.createBuffer();
+    let buffer_color1 = gl.createBuffer();
+    let buffer_vertex2 = gl.createBuffer();
+    let buffer_normal2 = gl.createBuffer();
+    let buffer_color2 = gl.createBuffer();
     let buffer_index = gl.createBuffer();
 
     // Vertices buffer
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer_vertex);
-    gl.vertexAttribPointer(loc_a_position, 4, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(loc_a_position);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer_vertex1);
+    gl.vertexAttribPointer(loc_a_position1, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(loc_a_position1);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer_vertex2);
+    gl.vertexAttribPointer(loc_a_position2, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(loc_a_position2);
 
     // Normals buffer
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer_normal);
-    gl.vertexAttribPointer(loc_a_normal, 4, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(loc_a_normal);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer_normal1);
+    gl.vertexAttribPointer(loc_a_normal1, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(loc_a_normal1);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer_normal2);
+    gl.vertexAttribPointer(loc_a_normal2, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(loc_a_normal2);
 
     // Colors buffer
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer_color);
-    gl.vertexAttribPointer(loc_a_color, 4, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(loc_a_color);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer_color1);
+    gl.vertexAttribPointer(loc_a_color1, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(loc_a_color1);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer_color2);
+    gl.vertexAttribPointer(loc_a_color2, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(loc_a_color2);
 
 
     // Variable declarations
@@ -269,8 +269,7 @@ async function init() {
     var lightPos = vec4(0, 0, -1, 0);
 
 
-    // Helper functions
-    const computeBuffers = (drawInfo) => {
+    const loadBuffer = (drawInfo, buffer_vertex, buffer_normal, buffer_color, buffer_index) => {
         const indices = drawInfo.indices;
         const vertices = drawInfo.vertices;
         const normals = drawInfo.normals;
@@ -287,6 +286,12 @@ async function init() {
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer_index);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+    }
+
+    // Helper functions
+    const computeBuffers = (drawInfo1, drawInfo2) => {
+        loadBuffer(drawInfo1, buffer_vertex1, buffer_normal1, buffer_color1, buffer_index);
+        loadBuffer(drawInfo2, buffer_vertex2, buffer_normal2, buffer_color2, buffer_index);
     }
 
     // Project an x,y pair onto a sphere of radius r OR a hyperbolic sheet
@@ -451,7 +456,10 @@ async function init() {
         if(paused)
             last_rendered_frame = frame_n;
 
-        computeBuffers(getInterpolated(frame_n));
+        [mesh1, mesh2, t] = getInterpolated(frame_n);
+        computeBuffers(mesh1, mesh2);
+        gl.uniform1f(loc_u_t, t);
+
 
         // Define the model, view and projection matrices
         var model = mat4(); // identity matrix
@@ -476,7 +484,7 @@ async function init() {
         gl.uniform4fv(loc_u_lightPos, lightPos);
         gl.uniform3fv(loc_u_eye, eye);
 
-        gl.drawElements(gl.TRIANGLES, drawingInfo.indices.length, gl.UNSIGNED_INT, 0);
+        gl.drawElements(gl.TRIANGLES, mesh1.indices.length, gl.UNSIGNED_INT, 0);
 
         if(mode == "interactive") {
             if (frame_n >= frames[currentScene][frames[currentScene].length - 1]) {
@@ -500,7 +508,11 @@ async function init() {
 
         requestAnimationFrame(render);
     };
-    computeBuffers(getInterpolated(0));
+
+    [mesh1, mesh2, t] = getInterpolated(0);
+    console.log(mesh1);
+    computeBuffers(mesh1, mesh2);
+    gl.uniform1f(loc_u_t, t);
     render();
 }
 
