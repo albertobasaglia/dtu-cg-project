@@ -31,11 +31,18 @@
           <br>
             Right click to move the goblin
           <br>
+          <br>
             Press <strong>r</strong> to reset the goblin's position
+          <br>
+            Press <strong>spacebar</strong> to do a jump animation
+          <br>
+            Press <strong>w</strong> to wave
+          <br>
+            Press <strong>enter</strong> to headbang
           </p>
         </div>
 
-        <div id="animationMenu" style="display: inline-block;">
+        <div id="animationMenu">
           <p>
             <strong>Choose an animation:</strong>
           </p>
@@ -47,11 +54,8 @@
       <p>The current queue is:</p>
       <p id="showQueue"></p>
     </div>
-    <div id="inspect-div" style="display: none;">
-      <div
-        class="slidecontainer"
-        style="display: inline-block;"
-      >
+    <div id="inspect-div">
+      <div class="slidecontainer">
         <input
           type="range"
           min="1"
@@ -68,7 +72,7 @@
       <button id="playpause">Play</button>
       <button id="exit">x</button>
     </div>
-    
+
     <script id="vertex-shader" type="x-shader/x-vertex">
       attribute vec4 a_position;
       attribute vec4 a_normal;
