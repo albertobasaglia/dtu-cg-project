@@ -19,6 +19,8 @@ async function init() {
     const exitBtn = document.getElementById("exit");
     const currentFrame = document.getElementById("currentFrame");
     const playPause = document.getElementById("playpause");
+    const prevFrame = document.getElementById("prevframe");
+    const nextFrame = document.getElementById("nextframe");
 
     const gl = WebGLUtils.setupWebGL(canvas);
     if (!gl) {
@@ -65,6 +67,14 @@ async function init() {
         interactiveDiv.style.display = "block";
         inspectDiv.style.display = "none";
         animationMenu.style.display = "inline-block";
+    });
+
+    nextFrame.addEventListener("click", function() {
+        frame_base += 1;
+    });
+
+    prevFrame.addEventListener("click", function() {
+        frame_base -= 1;
     });
 
     writeAnimationMenu(frames);
@@ -266,13 +276,12 @@ async function init() {
         if (paused) {
             paused = false;
             playPause.textContent = "Pause";
-            let current_time = window.performance.now();
-            start_time = current_time;
+            start_time = window.performance.now();
+            frame_base = last_rendered_frame;
         } else {
             paused = true;
             playPause.textContent = "Play";
             pause_time = window.performance.now();
-            frame_base = last_rendered_frame;
         }
     });
 
