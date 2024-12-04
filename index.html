@@ -10,9 +10,13 @@
     <script type="text/javascript" src="./common/quaternion.js"></script>
     <script type="text/javascript" src="script.js"></script>
   </head>
-  
+
   <body>
+    <div>
     <canvas id="glCanvas" width="720" height="540"></canvas>
+      <div id="animationMenu" style="display: inline-block;">
+      </div>
+    </div>
 
     <script id="vertex-shader" type="x-shader/x-vertex">
         attribute vec4 a_position;
@@ -75,9 +79,15 @@
             gl_FragColor = vec4(result, 1.0);
         }
     </script>
-    <p>The current queue is: </p>
-    <p id="showQueue"></p>
-    
+    <div id="interactive-div">
+      <p>The current queue is: </p>
+      <p id="showQueue"></p>
+    </div>
+    <div id="inspect-div" style="display: none;">
+      <p id="currentFrame"></p>
+      <button id="playpause">Play</button>
+      <button id="exit">x</button>
+    </div>
     <p>
       Left click on the canvas and drag the cursor to rotate the object.
     <br>

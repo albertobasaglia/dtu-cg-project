@@ -13,6 +13,12 @@ function initQuat(z_dir) {
 
 async function init() {
     const canvas = document.getElementById('glCanvas');
+    const animationMenu = document.getElementById("animationMenu");
+    const interactiveDiv = document.getElementById("interactive-div");
+    const inspectDiv = document.getElementById("inspect-div");
+    const exitBtn = document.getElementById("exit");
+    const currentFrame = document.getElementById("currentFrame");
+    const playPause = document.getElementById("playpause");
 
     const gl = WebGLUtils.setupWebGL(canvas);
     if (!gl) {
@@ -21,14 +27,48 @@ async function init() {
 
 
     // Read all the obj files comprising the keyframes
+    let mode = "interactive"; // "interactive" or "inspect"
+    let defaultScene = "idle";
+    let frame_base = 0;
+    let pause_time;
+    let last_rendered_frame;
+    let start_time = window.performance.now();
+    let paused = true;
+    let currentScene = defaultScene;
     let drawingInfos = {};
     let frames = {"idle": [1, 10, 35, 85, 115, 125],
                   "wave": [1, 100, 150, 200, 250, 300],
                   "headbang": [1, 15, 90, 135, 150],
                   "jumpingjack": [1, 20, 35, 50, 65, 80, 100]};
+
+    function writeAnimationMenu(frames) {
+        for (const [scene, obj] of Object.entries(frames)) {
+            let newdiv = document.createElement("button");
+            newdiv.textContent = scene;
+            animationMenu.appendChild(newdiv);
+
+            newdiv.addEventListener("click", function() {
+                mode = "inspect";
+                currentScene = scene;
+                interactiveDiv.style.display = "none";
+                inspectDiv.style.display = "block";
+                animationMenu.style.display = "none";
+                pause_time = window.performance.now();
+                start_time = window.performance.now();
+                frame_base = 0;
+            });
+        }
+    }
+
+    exitBtn.addEventListener("click", function() {
+        mode = "interactive";
+        interactiveDiv.style.display = "block";
+        inspectDiv.style.display = "none";
+        animationMenu.style.display = "inline-block";
+    });
+
+    writeAnimationMenu(frames);
     let frames_dst = "./data/keyframes_goblin/num.obj";
-    let defaultScene = "idle";
-    let currentScene = defaultScene;
     let queue = [];
     let fps = 60;
     for (const [scene, obj] of Object.entries(frames)) {
@@ -39,7 +79,7 @@ async function init() {
             drawingInfos[scene].push(drawingInfo);
         }
     }
-    
+
     // Get a keypress event and change the scene
     function keyPress(event) {
         if (event.keyCode == 13) { // Enter key
@@ -58,7 +98,7 @@ async function init() {
             queue.push("wave");
             document.getElementById("showQueue").innerHTML = queue;
         }
-        
+
         // Reset quaternion rotation
         if (event.keyCode == 82) { // r key
             [q_rot, q_inc, q_rot_inv] = initQuat(z_dir);
@@ -67,7 +107,7 @@ async function init() {
         }
     }
     document.addEventListener('keydown', keyPress);
-    
+
     // Interpolate between two keyframes
     function getInterpolated(frame) {
         let currentDrawingInfos = drawingInfos[currentScene];
@@ -180,10 +220,8 @@ async function init() {
 
 
     // Variable declarations
-    let aspect_ratio = canvas.width / canvas.height;    
-    let start_time = window.performance.now();
+    let aspect_ratio = canvas.width / canvas.height;
     let frametime = 1000.0/fps;
-    let frame_base = 0;
     var lightPos = vec4(0, 0, -1, 0);
 
 
@@ -223,6 +261,22 @@ async function init() {
         return z;
     }
 
+
+    playPause.addEventListener("click", function() {
+        if (paused) {
+            paused = false;
+            playPause.textContent = "Pause";
+            let current_time = window.performance.now();
+            start_time = current_time;
+        } else {
+            paused = true;
+            playPause.textContent = "Play";
+            pause_time = window.performance.now();
+            frame_base = last_rendered_frame;
+        }
+    });
+
+
     // Trackball
     var eye = vec3(0, 3, 6);
     var at = vec3(0, 2.5, 0);
@@ -230,7 +284,7 @@ async function init() {
     var z_dir = subtract(eye, at);
     var eye_dist = length(z_dir);
     var eye_pan = vec3(eye_dist, 0, 0);
-    
+
     // Initialize quaternions
     var [q_rot, q_inc, q_rot_inv] = initQuat(z_dir);
     up = q_rot_inv.apply(up);
@@ -245,7 +299,7 @@ async function init() {
     // When the mouse is pressed
     canvas.onmousedown = function (ev) {
         x = ev.clientX; y = ev.clientY;
-        
+
         // Start dragging if a mouse is in <canvas>
         var rect = ev.target.getBoundingClientRect();
         if (rect.left <= x && x < rect.right && rect.top <= y && y < rect.bottom) {
@@ -265,7 +319,7 @@ async function init() {
             var elapsed = now - lastTime;
             if (elapsed > 10) {
                 lastTime = now;
-                
+
                 var x = ev.clientX; var y = ev.clientY;
                 var rect = ev.target.getBoundingClientRect();
                 var s_x = ((x - rect.left) / rect.width - 0.5) * 2;
@@ -341,8 +395,18 @@ async function init() {
     const render = () => {
         // Update the frame number
         let current_time = window.performance.now();
-        let delta = current_time - start_time;
+        let delta;
+
+        if(mode == "inspect" && paused) {
+            delta = pause_time - start_time;
+        } else {
+            delta = current_time - start_time;
+        }
+
+
         let frame_n = frame_base + Math.floor(delta / frametime);
+        if(paused)
+            last_rendered_frame = frame_n;
 
         computeBuffers(getInterpolated(frame_n));
 
@@ -350,7 +414,7 @@ async function init() {
         var model = mat4(); // identity matrix
         var fovy = 60; var near = 0.1; var far = 100;
         var proj = perspective(fovy, aspect_ratio, near, far);
-        
+
         // Rotate view with quaternion
         q_rot = q_rot.multiply(q_inc);
         var rot_up = q_rot.apply(up);
@@ -372,19 +436,22 @@ async function init() {
 
         gl.drawElements(gl.TRIANGLES, drawingInfo.indices.length, gl.UNSIGNED_INT, 0);
 
-        if (frame_n >= frames[currentScene][frames[currentScene].length - 1]) {
-            frame_base = 0;
-            start_time = window.performance.now();
-            
-            if (queue.length > 0) {
-                // Get the first scene from the queue
-                currentScene = queue.shift();
-                
-                // Remove the that scene from the displayed queue
-                document.getElementById("showQueue").innerHTML = queue;
-            } else {
-                currentScene = defaultScene;
+        if(mode == "interactive") {
+            if (frame_n >= frames[currentScene][frames[currentScene].length - 1]) {
+                frame_base = 0;
+                start_time = window.performance.now();
+
+                if (queue.length > 0) {
+                    // Get the first scene from the queue
+                    currentScene = queue.shift();
+                    // Remove the that scene from the displayed queue
+                    document.getElementById("showQueue").innerHTML = queue;
+                } else {
+                    currentScene = defaultScene;
+                }
             }
+        } else {
+            currentFrame.innerHTML = frame_n;
         }
 
         requestAnimationFrame(render);
