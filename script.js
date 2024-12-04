@@ -191,12 +191,12 @@ async function init() {
         var model = mat4();
         var proj = perspective(60, aspect_ratio, 0.1, 100);
 
-        var eye = vec3(0, 3, 8);
+        var eye = vec3(0, 3, 6);
         var at = vec3(0, 2.5, 0);
         var up = vec3(0, 1, 0);
         var view = lookAt(eye, at, up);
 
-        let clearColor = [0.2, 0.4, 0.3];
+        let clearColor = [0.8, 0.4, 0.1];
 
         gl.clearColor(...clearColor, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -214,9 +214,10 @@ async function init() {
             start_time = window.performance.now();
             
             if (queue.length > 0) {
+                // Get the first scene from the queue
                 currentScene = queue.shift();
-
-                // Remove that scene from the queue
+                
+                // Remove the that scene from the displayed queue
                 document.getElementById("showQueue").innerHTML = queue;
             } else {
                 currentScene = defaultScene;
