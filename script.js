@@ -466,7 +466,6 @@ async function init() {
         var rot_eye = q_rot.apply(vec3(0, 0, eye_pan[0]));
 
         var view = lookAt(add(rot_eye, centre), centre, rot_up); // Rotate using quaternion
-        //var view = lookAt(eye, at, up);
 
 
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -495,6 +494,8 @@ async function init() {
             }
         } else {
             currentFrame.innerHTML = frame_n;
+            if(!paused)
+                slider.value = frame_n;
         }
 
         requestAnimationFrame(render);
