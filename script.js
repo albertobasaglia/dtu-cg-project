@@ -343,7 +343,7 @@ async function init() {
 
 
     // Trackball
-    var eye = vec3(0, 3, 10);
+    var eye = vec3(0, 3, 6);
     var at = vec3(0, 2.5, 0);
     var up = vec3(0, 1, 0);
     var z_dir = subtract(eye, at);
