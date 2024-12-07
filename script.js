@@ -468,7 +468,6 @@ async function init() {
 
         // the frame is updated only if the animation is not paused
         if(mode == "interactive" || !paused) {
-            console.log("not paused");
             frame_n += Math.floor(delta / frametime);
         }
 
@@ -522,7 +521,9 @@ async function init() {
             currentFrame.innerHTML = frame_n;
             slider.value = frame_n;
             if (frame_n > frames[currentScene][frames[currentScene].length - 1]) {
-                leave_interactive();
+                frame_base = 0;
+                start_time = window.performance.now();
+                frame_n = 0;
             }
         }
 
@@ -530,7 +531,6 @@ async function init() {
     };
 
     [mesh1, mesh2, t] = getInterpolated(0);
-    console.log(mesh1);
     computeBuffers(mesh1, mesh2);
     gl.uniform1f(loc_u_t, t);
     render();
