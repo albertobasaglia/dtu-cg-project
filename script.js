@@ -178,7 +178,7 @@ async function init() {
         if (event.keyCode == 82) { // r key
             [q_rot, q_inc, q_rot_inv] = initQuat(z_dir);
             up = q_rot_inv.apply(up);
-            eye_pan = vec3(eye_dist, 0, 0);
+            eye_pan = vec3(0, 0, eye_dist);
         }
     }
     document.addEventListener('keydown', keyPress);
@@ -343,12 +343,12 @@ async function init() {
 
 
     // Trackball
-    var eye = vec3(0, 3, 6);
+    var eye = vec3(0, 3, 10);
     var at = vec3(0, 2.5, 0);
     var up = vec3(0, 1, 0);
     var z_dir = subtract(eye, at);
     var eye_dist = length(z_dir);
-    var eye_pan = vec3(eye_dist, 0, 0);
+    var eye_pan = vec3(0, 0, eye_dist);
 
     // Initialize quaternions
     var [q_rot, q_inc, q_rot_inv] = initQuat(z_dir);
@@ -400,13 +400,13 @@ async function init() {
                         break;
                     }
                     case 2: {// Dolly
-                        eye_pan[0] += (s_y - s_last_y) * eye_pan[0];
-                        eye_pan[0] = Math.max(0.1, eye_pan[0]);
+                        eye_pan[2] += (s_y - s_last_y) * eye_pan[2];
+                        eye_pan[2] = Math.max(0.1, eye_pan[2]);
                         break;
                     }
                     case 3: {// Pan
-                        eye_pan[1] += (s_x - s_last_x) * eye_pan[0] * 0.25;
-                        eye_pan[2] += (s_y - s_last_y) * eye_pan[0] * 0.25;
+                        eye_pan[0] += (s_x - s_last_x) * eye_pan[2] * 0.25;
+                        eye_pan[1] += (s_y - s_last_y) * eye_pan[2] * 0.25;
                         break;
                     }
                 }
@@ -486,8 +486,8 @@ async function init() {
         q_rot = q_rot.multiply(q_inc);
         var rot_up = q_rot.apply(up);
         var right = q_rot.apply(vec3(1, 0, 0));
-        var centre = vec3([at[0] - right[0] * eye_pan[1] - rot_up[0] * eye_pan[2], at[1] - right[1] * eye_pan[1] - rot_up[1] * eye_pan[2], at[2] - right[2] * eye_pan[1] - rot_up[2] * eye_pan[2]]);
-        var rot_eye = q_rot.apply(vec3(0, 0, eye_pan[0]));
+        var centre = vec3([at[0] - right[0] * eye_pan[0] - rot_up[0] * eye_pan[1], at[1] - right[1] * eye_pan[0] - rot_up[1] * eye_pan[1], at[2] - right[2] * eye_pan[0] - rot_up[2] * eye_pan[1]]);
+        var rot_eye = q_rot.apply(vec3(0, 0, eye_pan[2]));
 
         var view = lookAt(add(rot_eye, centre), centre, rot_up); // Rotate using quaternion
 
