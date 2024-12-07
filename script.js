@@ -28,11 +28,16 @@ async function init() {
     // Read all the obj files comprising the keyframes
     let mode = "interactive"; // "interactive" or "inspect"
     let defaultScene = "idle";
-    let frame_base = 0;
-    let pause_time;
-    let last_rendered_frame;
-    let start_time = window.performance.now();
-    let paused = true;
+    let fps = 60;
+
+    let frame_base = 0; // current "starting" frame in the run
+    let pause_time; // time when "Pause" was clicked
+    let start_time = window.performance.now(); // starting time of the run
+    // a run is started by Play and concluded by Pause
+    // at the end of a run, the frame_base is updated to the current frame
+    // and the pause_time is updated to the current time
+    let paused = true; // whether the animation is paused
+
     let currentScene = defaultScene;
     let drawingInfos = {};
     let frames = {"idle": [1, 10, 35, 85, 115, 125],
@@ -40,43 +45,27 @@ async function init() {
                   "headbang": [1, 15, 90, 135, 150],
                   "jumpingjack": [1, 20, 35, 50, 65, 80, 100]};
 
-    function writeAnimationMenu(frames) {
-        for (const [scene, obj] of Object.entries(frames)) {
-            let newdiv = document.createElement("button");
-            newdiv.textContent = scene;
-            animationMenu.appendChild(newdiv);
-
-            newdiv.addEventListener("click", function() {
-                mode = "inspect";
-                currentScene = scene;
-                interactiveDiv.style.display = "none";
-                inspectDiv.style.display = "block";
-                animationMenu.style.display = "none";
-                prevFrame.disabled = true;
-
-                slider.min = 0;
-                slider.max = frames[scene][frames[scene].length - 1];
-                slider.value = 0;
-
-                pause_time = window.performance.now();
-                start_time = window.performance.now();
-                frame_base = 0;
-            });
-        }
-    }
-
-    exitBtn.addEventListener("click", function() {
+    let leave_interactive = () => {
         mode = "interactive";
         interactiveDiv.style.display = "block";
         inspectDiv.style.display = "none";
         animationMenu.style.display = "inline-block";
         currentScene = defaultScene;
         frame_base = 0;
-    });
+        paused = true;
+        playPause.textContent = "Play";
+    };
+
+    exitBtn.addEventListener("click", leave_interactive);
 
 
 
     function updateInputs() {
+        if (!paused) {
+            prevFrame.disabled = true;
+            nextFrame.disabled = true;
+            return;
+        }
         if (frame_base == 0) {
             prevFrame.disabled = true;
         } else {
@@ -107,10 +96,56 @@ async function init() {
         updateInputs();
     });
 
+    let do_pause = () => {
+        paused = true;
+        playPause.textContent = "Play";
+        pause_time = window.performance.now();
+        frame_base += Math.floor((pause_time - start_time) / frametime);
+    }
+
+    let do_play = () => {
+        paused = false;
+        playPause.textContent = "Pause";
+        start_time = window.performance.now();
+    }
+
+    playPause.addEventListener("click", function() {
+        if (paused) {
+            do_play();
+        } else {
+            do_pause();
+        }
+    });
+
+    function writeAnimationMenu(frames) {
+        for (const [scene, obj] of Object.entries(frames)) {
+            let newdiv = document.createElement("button");
+            newdiv.textContent = scene;
+            animationMenu.appendChild(newdiv);
+
+            newdiv.addEventListener("click", function() {
+                mode = "inspect";
+                currentScene = scene;
+                interactiveDiv.style.display = "none";
+                inspectDiv.style.display = "block";
+                animationMenu.style.display = "none";
+                prevFrame.disabled = true;
+
+                slider.min = 0;
+                slider.max = frames[scene][frames[scene].length - 1];
+                slider.value = 0;
+
+                pause_time = window.performance.now();
+                start_time = window.performance.now();
+                frame_base = 0;
+            });
+        }
+    }
+
+
     writeAnimationMenu(frames);
     let frames_dst = "./data/keyframes_goblin/num.obj";
     let queue = [];
-    let fps = 60;
     for (const [scene, obj] of Object.entries(frames)) {
         drawingInfos[scene] = [];
         for (let frame of frames[scene]) {
@@ -191,10 +226,6 @@ async function init() {
             }
         }
     }
-
-    // Get the first frame
-    let drawingInfo = getInterpolated(0);
-
 
     // Initialize WebGL
     gl.enable(gl.CULL_FACE);
@@ -309,20 +340,6 @@ async function init() {
             z = t * t / d;
         return z;
     }
-
-
-    playPause.addEventListener("click", function() {
-        if (paused) {
-            paused = false;
-            playPause.textContent = "Pause";
-            start_time = window.performance.now();
-            frame_base = last_rendered_frame;
-        } else {
-            paused = true;
-            playPause.textContent = "Play";
-            pause_time = window.performance.now();
-        }
-    });
 
 
     // Trackball
@@ -443,18 +460,17 @@ async function init() {
     const render = () => {
         // Update the frame number
         let current_time = window.performance.now();
-        let delta;
 
-        if(mode == "inspect" && paused) {
-            delta = pause_time - start_time;
-        } else {
-            delta = current_time - start_time;
+        // Compute the time elapsed since the last frame
+        let delta = current_time - start_time;
+
+        let frame_n = frame_base;
+
+        // the frame is updated only if the animation is not paused
+        if(mode == "interactive" || !paused) {
+            console.log("not paused");
+            frame_n += Math.floor(delta / frametime);
         }
-
-
-        let frame_n = frame_base + Math.floor(delta / frametime);
-        if(paused)
-            last_rendered_frame = frame_n;
 
         [mesh1, mesh2, t] = getInterpolated(frame_n);
         computeBuffers(mesh1, mesh2);
@@ -501,9 +517,13 @@ async function init() {
                 }
             }
         } else {
+            // Update the current frame number in the UI
+            updateInputs();
             currentFrame.innerHTML = frame_n;
-            if(!paused)
-                slider.value = frame_n;
+            slider.value = frame_n;
+            if (frame_n > frames[currentScene][frames[currentScene].length - 1]) {
+                leave_interactive();
+            }
         }
 
         requestAnimationFrame(render);
